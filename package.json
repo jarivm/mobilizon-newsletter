@@ -1,0 +1,19 @@
+{
+  "name": "mobilizon-newsletter",
+  "version": "1.0.0",
+  "description": "Compiles Mobilizon posts and events into a newsletter",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Jari van Menxel",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "html-to-text": "^9.0.5",
+    "htmlparser2": "^9.1.0",
+    "ical.js": "^2.1.0"
+  }
+}
