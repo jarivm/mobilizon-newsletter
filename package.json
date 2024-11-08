@@ -4,6 +4,7 @@
   "description": "Compiles Mobilizon posts and events into a newsletter",
   "main": "src/index.js",
   "type": "module",
+  "bin": "./src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"

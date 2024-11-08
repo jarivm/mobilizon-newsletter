@@ -39,7 +39,7 @@ function previousMonth(date) {
 	}
 }
 
-async function fetchIcsData(url) {
+async function fetchIcs(url) {
 	const result = await fetch(url);
 	const text = await result.text();
 
@@ -48,7 +48,7 @@ async function fetchIcsData(url) {
 	return new ICAL.Component(jcalData);
 }
 
-async function fetchRssData(url) {
+async function fetchRss(url) {
 	const result = await fetch(url);
 	const text = await result.text();
 
@@ -82,95 +82,26 @@ function capitalize(val) {
 	return String(val).charAt(0).toUpperCase() + String(val).slice(1);
 }
 
-function formatGroupUrl(groupName) {
-	return `${MOBILIZON_BASE_URL}/@${groupName}`;
-}
-
-const html = [];
-
-const monthName = MONTH_DATE.toLocaleString(LOCALE, { month: 'long' });
-
-html.push(`<h1>Nieuwsbrief ${monthName} 2024</h1>`);
-
-html.push(`<p>Lieve rebel,</p>`);
-
-html.push(`<p>Welkom bij de nieuwsbrief!</p>`);
-
-html.push(`<p>[op maat gemaakte input kan hier]</p>`);
-
-html.push(`<p>Met (dier)vriendelijke groeten,</p>`);
-
-html.push(`<p>Animal Rebellion</p>`);
-
-html.push(`<h2>Aankomende evenementen</h2>`);
-
-{
-	const calendar = await fetchIcsData(MOBILIZON_ICS_URL);
-	const monthEndDate = nextMonth(MONTH_DATE);
-	let events = calendar.getAllSubcomponents('vevent').filter((event) => {
+function filterEvents(ics, startDate, endDate) {
+	let events = ics.getAllSubcomponents('vevent').filter((event) => {
 		const eventStart = event.getFirstPropertyValue('dtstart').toJSDate();
 
-		return eventStart > MONTH_DATE && eventStart < monthEndDate;
+		return eventStart > startDate && eventStart <= endDate;
 	});
-
-	html.push(
-		`<p>In ${monthName} staan ${events.length} evenementen op de planning!</p>`
-	);
-
-	html.push(
-		`<p>Kijk op <a href="${MOBILIZON_BASE_URL}">Mobilizon</a> voor een actueel overzicht van alle evenementen.</p>`
-	);
-
 	events.sort((a, b) => {
 		const aDate = a.getFirstPropertyValue('dtstart').toJSDate();
 		const bDate = b.getFirstPropertyValue('dtstart').toJSDate();
 		return compareDates(aDate, bDate);
 	});
 
-	events.forEach((event) => {
-		const url = event.getFirstPropertyValue('url');
-		const title = event.getFirstPropertyValue('summary');
-		const date = event.getFirstPropertyValue('dtstart').toJSDate();
-		const description = event.getFirstPropertyValue('description');
-		const groupName = event.getFirstPropertyValue('organizer');
-		const location = event.getFirstPropertyValue('location');
-
-		const timestamp = capitalize(
-			date.toLocaleDateString(LOCALE, {
-				weekday: 'long',
-				day: 'numeric',
-				month: 'long',
-			})
-		);
-
-		html.push(`<h3><a href="${url}">${title}</a></h3>`);
-		html.push(`<p><b>Door:</b> ${groupName}</p>`);
-		html.push(
-			`<p><b>Wanneer</b>: <time datetime="${date.toLocaleDateString(LOCALE)}">${timestamp}</time></p>`
-		);
-		if (location) {
-			html.push(
-				`<p><b>Waar</b>: <a href="https://www.openstreetmap.org/search?query=${encodeURIComponent(location)}" target="_blank" rel="noopener noreferrer"><adress>${location}</address></a></p>`
-			);
-		}
-		html.push(
-			`<p>${truncate(description, MAX_DESCRIPTION_LENGTH)} <a href="${url}" title="${title}">Lees meer.</a></p>`
-		);
-	});
+	return events;
 }
 
-html.push(`<h2>Berichten van afgelopen maand</h2>`);
-
-{
-	const rss = await fetchRssData(MOBILIZON_RSS_URL);
-
-	const previousMonthStartDate = previousMonth(MONTH_DATE);
-
+function filterRssItems(rss, startDate, endDate) {
 	const items = rss.items.filter((item) => {
 		const date = new Date(item.pubDate);
 
-		const isInDateRange =
-			date > previousMonthStartDate && date <= MONTH_DATE;
+		const isInDateRange = date > startDate && date <= endDate;
 		if (!isInDateRange) {
 			return false;
 		}
@@ -192,6 +123,84 @@ html.push(`<h2>Berichten van afgelopen maand</h2>`);
 		return compareDates(aDate, bDate);
 	});
 
+	return items;
+}
+
+function formatDate(date) {
+	return date.toLocaleDateString(LOCALE, {
+		weekday: 'long',
+		day: 'numeric',
+		month: 'long',
+	});
+}
+
+function formatTime(date) {
+	return date.toLocaleTimeString(LOCALE, {
+		hour: '2-digit',
+		minute: '2-digit',
+	});
+}
+
+const html = [];
+
+const monthName = MONTH_DATE.toLocaleString(LOCALE, { month: 'long' });
+
+html.push(`<h1>Nieuwsbrief ${monthName} 2024</h1>`);
+
+html.push(`<p>Lieve rebel,</p>`);
+
+html.push(`<p>Welkom bij de nieuwsbrief!</p>`);
+
+html.push(`<p>[op maat gemaakte input kan hier]</p>`);
+
+html.push(`<p>Met (dier)vriendelijke groeten,</p>`);
+
+html.push(`<p>Animal Rebellion</p>`);
+
+html.push(`<h2>Aankomende evenementen</h2>`);
+
+{
+	const ics = await fetchIcs(MOBILIZON_ICS_URL);
+	const events = filterEvents(ics, MONTH_DATE, nextMonth(MONTH_DATE));
+
+	html.push(
+		`<p>In ${monthName} staan ${events.length} evenementen op de planning!</p>`
+	);
+
+	html.push(
+		`<p>Kijk op <a href="${MOBILIZON_BASE_URL}">Mobilizon</a> voor een actueel overzicht van alle evenementen.</p>`
+	);
+
+	events.forEach((event) => {
+		const url = event.getFirstPropertyValue('url');
+		const title = event.getFirstPropertyValue('summary');
+		const date = event.getFirstPropertyValue('dtstart').toJSDate();
+		const description = event.getFirstPropertyValue('description');
+		const groupName = event.getFirstPropertyValue('organizer');
+		const location = event.getFirstPropertyValue('location');
+
+		html.push(`<h3><a href="${url}">${title}</a></h3>`);
+		html.push(`<p><b>Door:</b> ${groupName}</p>`);
+		html.push(
+			`<p><b>Wanneer</b>: <time datetime="${date.toLocaleDateString(LOCALE)}">${capitalize(formatDate(date))} om ${formatTime(date)}</time></p>`
+		);
+		if (location) {
+			html.push(
+				`<p><b>Waar</b>: <a href="https://www.openstreetmap.org/search?query=${encodeURIComponent(location)}" target="_blank" rel="noopener noreferrer"><adress>${location}</address></a></p>`
+			);
+		}
+		html.push(
+			`<p>${truncate(description, MAX_DESCRIPTION_LENGTH)} <a href="${url}" title="${title}">Meer lezen.</a></p>`
+		);
+	});
+}
+
+html.push(`<h2>Berichten van afgelopen maand</h2>`);
+
+{
+	const rss = await fetchRss(MOBILIZON_RSS_URL);
+	const items = filterRssItems(rss, previousMonth(MONTH_DATE), MONTH_DATE);
+
 	html.push(
 		`<p>Afgelopen maand hebben jullie ${items.length} berichten gedeeld.</p>`
 	);
@@ -202,13 +211,7 @@ html.push(`<h2>Berichten van afgelopen maand</h2>`);
 	html.push('<ul>');
 	items.forEach((item) => {
 		const date = new Date(item.pubDate);
-		const timestamp = capitalize(
-			date.toLocaleDateString(LOCALE, {
-				weekday: 'long',
-				day: 'numeric',
-				month: 'long',
-			})
-		);
+		const timestamp = capitalize(formatDate(date));
 		const url = item.link;
 		const title = item.title;
 		const description = truncate(item.description, MAX_DESCRIPTION_LENGTH);
